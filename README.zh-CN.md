@@ -46,7 +46,9 @@ python src/wallpaper_core.py --schedule
 
 ## 界面预览
 
-<img src="screenshots/BingWallpaper_run.png" alt="界面预览" width="640">
+<div align="center">
+  <img src="screenshots/BingWallpaper_run.png" alt="界面预览" width="640">
+</div>
 
 ## 安装
 

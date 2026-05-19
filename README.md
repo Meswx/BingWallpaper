@@ -1,5 +1,7 @@
 # 🖼️ 4K Bing Wallpaper Tool
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)

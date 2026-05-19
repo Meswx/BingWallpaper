@@ -46,7 +46,7 @@ python src/wallpaper_core.py --schedule
 
 ## Screenshot
 
-![Screenshot](screenshots/BingWallpaper_run.png)
+<img src="screenshots/BingWallpaper_run.png" alt="Screenshot" width="640">
 
 ## Install
 

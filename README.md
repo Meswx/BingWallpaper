@@ -1,71 +1,86 @@
-# 🖼️ 4K Bing 壁纸工具
+# 🖼️ 4K Bing Wallpaper Tool
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 
-自动抓取每日 Bing 4K 壁纸，支持**单张设置**和**幻灯片自动轮换**，内置 GUI 界面，开箱即用。
+Automatically fetch daily Bing 4K wallpapers and set them as your desktop background. Supports **single wallpaper** and **slideshow** modes. Built-in GUI, ready to use out of the box.
 
-## ✨ 功能特性
+## Features
 
-- 🌐 **双源抓取** — peapix.com 优先，Bing 官方 API 自动备用
-- 🖼️ **真 4K UHD** — 使用 Bing `_UHD.jpg` 原图（3-5MB+）
-- 🔄 **幻灯片放映** — 自动轮换壁纸目录中的所有图片
-- 💻 **GUI 界面** — 基于 tkinter，无需命令行
-- 📦 **独立 exe** — 可打包为单文件，无需 Python 环境
+- 🌐 **Dual-source fetching** — peapix.com as primary, Bing official API as fallback
+- 🖼️ **True 4K UHD** — uses Bing `_UHD.jpg` original image (3-5MB+)
+- 🔄 **Slideshow** — auto-rotate all wallpapers in your local directory
+- 💻 **GUI interface** — built with tkinter, no command line needed
+- 📦 **Standalone exe** — can be packaged into a single file, no Python required
 
-## 🚀 快速开始
+## Quick Start
 
-### 方式一：直接运行 exe
+### Option 1: Download the exe
 
-从 [Releases](https://github.com/你的用户名/BingWallpaper/releases) 下载最新版 `BingWallpaper.exe`，双击运行。
+Download the latest `BingWallpaper.exe` from [Releases](https://github.com/Meswx/BingWallpaper/releases) and run it.
 
-### 方式二：从源码运行
+### Option 2: Run from source
 
 ```bash
-git clone https://github.com/你的用户名/BingWallpaper.git
+git clone https://github.com/Meswx/BingWallpaper.git
 cd BingWallpaper
 pip install -r requirements.txt
 python src/wallpaper_gui.py
 ```
 
-### 方式三：命令行
+### Option 3: Command line
 
 ```bash
-# 下载今日壁纸
+# Download today's wallpaper
 python src/wallpaper_core.py
 
-# 批量下载 10 张
+# Batch download 10 wallpapers
 python src/wallpaper_core.py --fetch 10
 
-# 定时模式（每天 09:00 自动更新）
+# Scheduled mode (auto-update every day at 09:00)
 python src/wallpaper_core.py --schedule
 ```
 
-## 📸 界面预览
+## Screenshot
 
 ```
 ┌────────────────────────────────────────────┐
-│         🖼️ 4K Bing 壁纸工具                │
-│     每日 4K Bing 壁纸自动抓取 & 桌面设置      │
+│         🖼️ 4K Bing Wallpaper Tool          │
+│     Daily 4K Bing Wallpaper & Desktop      │
 ├────────────────────────────────────────────┤
-│ 壁纸保存目录: D:\Claude Code\wallpapers    │
-│                              [打开]         │
+│ Wallpaper Directory: D:\Claude Code\wallpapers │
+│                              [Open]        │
 ├────────────────────────────────────────────┤
-│ 已下载壁纸                                 │
+│ Downloaded Wallpapers                      │
 │ ┌──────────────────────────────────────┐   │
 │ │ bing_wallpaper_2026-05-19_xxx.jpg    │   │
 │ │ bing_wallpaper_2026-05-18_xxx.jpg    │   │
 │ │ ...                                  │   │
 │ └──────────────────────────────────────┘   │
 ├────────────────────────────────────────────┤
-│ 设置模式: ◉ 单张壁纸  ○ 幻灯片轮换          │
+│ Mode: ○ Single Wallpaper  ○ Slideshow      │
 ├────────────────────────────────────────────┤
-│ [📥 下载今日] [📦 批量下载] [🖼️ 设为壁纸] [🔄 幻灯片] │
+│ [📥 Fetch Today] [📦 Batch] [🖼️ Set] [🔄 Slideshow] │
 └────────────────────────────────────────────┘
 ```
 
-## ⚙️ 配置 (config.json)
+## Install
+
+### Download
+
+You can download the source code and build it yourself, or download the built version from the [Releases](https://github.com/Meswx/BingWallpaper/releases) page.
+
+### Build the exe
+
+```bash
+pip install pyinstaller
+pyinstaller --onefile --windowed --name "BingWallpaper" src/wallpaper_gui.py
+```
+
+The output exe will be at `dist/BingWallpaper.exe`.
+
+## Configuration (config.json)
 
 ```json
 {
@@ -78,62 +93,72 @@ python src/wallpaper_core.py --schedule
 }
 ```
 
-| 配置项 | 说明 |
-|--------|------|
-| `set_wallpaper` | `true`=单张壁纸, `"slideshow"`=幻灯片轮换 |
-| `save_dir` | 壁纸保存目录 |
-| `slideshow_interval` | 幻灯片轮换间隔（分钟） |
+| Option | Description |
+|--------|-------------|
+| `set_wallpaper` | `true` = single wallpaper, `"slideshow"` = auto-rotate |
+| `save_dir` | Directory to save wallpapers |
+| `slideshow_interval` | Slideshow rotation interval (minutes) |
 
-## 📦 打包为 exe
+## How It Works
+
+### True 4K UHD
+
+Bing image URLs support two approaches for high resolution:
+
+| Method | URL Example | File Size | Quality |
+|--------|-------------|-----------|---------|
+| Resize parameter | `?w=3840&h=2160` | ~464KB | Average |
+| **UHD original** ✅ | `_UHD.jpg` suffix | **3-5MB+** | **Best** |
+
+This tool uses the `_UHD.jpg` suffix to get the true 4K original image.
+
+### Windows Slideshow
+
+Implemented via Windows registry, consistent with the built-in Windows slideshow experience:
+
+- `HKCU\Control Panel\Desktop` → Wallpaper style (fill)
+- `HKCU\...\Explorer\Wallpapers` → `BackgroundType=2` (slideshow mode)
+- `HKCU\...\Explorer\Slideshow` → Rotation interval
+
+## Project Structure
+
+```
+BingWallpaper/
+├── src/
+│   ├── wallpaper_gui.py      # GUI application
+│   └── wallpaper_core.py     # Core logic (CLI)
+├── dist/
+│   └── BingWallpaper.exe     # Packaged standalone program
+├── config.json               # Configuration file
+├── requirements.txt          # Python dependencies
+├── LICENSE                   # MIT License
+├── README.md                 # This file
+└── .github/
+    └── workflows/            # GitHub Actions CI
+```
+
+## Develop and Build
+
+### Development
+
+- Install [Python 3.10+](https://www.python.org/)
+- Run `pip install -r requirements.txt` to install dependencies
+- Run `python src/wallpaper_gui.py` to start the GUI
+- Run `python src/wallpaper_core.py` to use the CLI
+
+### Build and Package
 
 ```bash
 pip install pyinstaller
 pyinstaller --onefile --windowed --name "BingWallpaper" src/wallpaper_gui.py
 ```
 
-生成的 exe 在 `dist/BingWallpaper.exe`。
+The packaged file will be in the `./dist` folder.
 
-## 🔧 技术细节
+## Contributing
 
-### 4K UHD 获取原理
+Issues and Pull Requests are welcome!
 
-Bing 图片 URL 获取高分辨率有两种方式：
-
-| 方式 | URL 示例 | 文件大小 | 画质 |
-|------|----------|----------|------|
-| 动态缩放参数 | `?w=3840&h=2160` | ~464KB | 一般 |
-| **UHD 原图** ✅ | `_UHD.jpg` 后缀 | **3-5MB+** | **最佳** |
-
-本工具使用 `_UHD.jpg` 后缀获取真正的 4K 原图。
-
-### Windows 幻灯片实现
-
-通过修改注册表实现，和 Windows 自带幻灯片放映效果一致：
-- `HKCU\Control Panel\Desktop` → 壁纸样式（填充）
-- `HKCU\...\Explorer\Wallpapers` → BackgroundType=2（幻灯片模式）
-- `HKCU\...\Explorer\Slideshow` → 轮换间隔
-
-## 📁 项目结构
-
-```
-BingWallpaper/
-├── src/
-│   ├── wallpaper_gui.py      # GUI 主程序
-│   └── wallpaper_core.py     # 核心逻辑（命令行）
-├── dist/
-│   └── BingWallpaper.exe     # 打包后的独立程序
-├── config.json               # 配置文件
-├── requirements.txt          # Python 依赖
-├── LICENSE                   # MIT 开源协议
-├── README.md                 # 本文件
-└── .github/
-    └── workflows/            # GitHub Actions 自动化
-```
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 📄 许可证
+## License
 
 [MIT](LICENSE) © 2026

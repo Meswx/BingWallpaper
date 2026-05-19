@@ -46,26 +46,7 @@ python src/wallpaper_core.py --schedule
 
 ## Screenshot
 
-```
-┌────────────────────────────────────────────┐
-│         🖼️ 4K Bing Wallpaper Tool          │
-│     Daily 4K Bing Wallpaper & Desktop      │
-├────────────────────────────────────────────┤
-│ Wallpaper Directory: D:\Claude Code\wallpapers │
-│                              [Open]        │
-├────────────────────────────────────────────┤
-│ Downloaded Wallpapers                      │
-│ ┌──────────────────────────────────────┐   │
-│ │ bing_wallpaper_2026-05-19_xxx.jpg    │   │
-│ │ bing_wallpaper_2026-05-18_xxx.jpg    │   │
-│ │ ...                                  │   │
-│ └──────────────────────────────────────┘   │
-├────────────────────────────────────────────┤
-│ Mode: ○ Single Wallpaper  ○ Slideshow      │
-├────────────────────────────────────────────┤
-│ [📥 Fetch Today] [📦 Batch] [🖼️ Set] [🔄 Slideshow] │
-└────────────────────────────────────────────┘
-```
+![Screenshot](screenshots/BingWallpaper_run.png)
 
 ## Install
 

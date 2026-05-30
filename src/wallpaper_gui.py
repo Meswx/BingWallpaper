@@ -1,31 +1,38 @@
 """
 4K Bing 壁纸工具 - Windows GUI 版本
-使用 tkinter 构建界面，PyInstaller 打包为独立 exe
+使用 customtkinter 构建现代界面，PyInstaller 打包为独立 exe
 """
 
 import os
 import sys
 import json
 import ctypes
-import logging
 import re
 import threading
 from datetime import datetime
 from pathlib import Path
-from tkinter import *
-from tkinter import ttk, messagebox
+from tkinter import filedialog, messagebox
 from urllib.parse import urljoin
 
+import customtkinter as ctk
+import PIL.Image
+import PIL.ImageTk
 import requests
 from bs4 import BeautifulSoup
 
-# ── 配置 ──────────────────────────────────────────────────────────────────────
+# ── 主题配置 ──────────────────────────────────────────────────────────────────
+
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
+
+# ── 应用配置 ──────────────────────────────────────────────────────────────────
 
 APP_NAME = "4K Bing 壁纸工具"
+APP_VERSION = "v0.1.0"
 CONFIG_PATH = Path(__file__).parent / "config.json"
 DEFAULT_CONFIG = {
     "source_url": "https://peapix.com/bing",
-    "save_dir": str(Path(__file__).parent / "wallpapers"),
+    "save_dir": str(Path(__file__).parent.parent / "wallpapers"),
     "resolution": "3840x2160",
     "set_wallpaper": True,
     "save_wallpaper": True,
@@ -119,9 +126,6 @@ def enable_slideshow(wallpaper_dir: str, interval_minutes: int = 1):
         winreg.SetValueEx(key_slide, "Interval", 0, winreg.REG_DWORD, interval_ms)
         winreg.CloseKey(key_slide)
 
-        SPI_SETDESKWALLPAPER = 0x0014
-        SPIF_UPDATEINIFILE = 0x01
-        SPIF_SENDCHANGE = 0x02
         ctypes.windll.user32.SystemParametersInfoW(
             SPI_SETDESKWALLPAPER, 0, str(images[0].resolve()),
             SPIF_UPDATEINIFILE | SPIF_SENDCHANGE,
@@ -180,107 +184,341 @@ def download_image(url: str, save_dir: Path, title: str = "") -> Path | None:
 
 # ── GUI 界面 ──────────────────────────────────────────────────────────────────
 
-class WallpaperApp:
-    def __init__(self, root: Tk):
-        self.root = root
-        self.root.title(APP_NAME)
-        self.root.geometry("520x480")
-        self.root.resizable(False, False)
-        self.cfg = load_config()
+class WallpaperApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
 
-        self._build_ui()
+        self.cfg = load_config()
+        self._selected_path: Path | None = None
+        self._preview_photo = None
+        self._preview_original: PIL.Image.Image | None = None
+
+        # 窗口配置
+        self.title(f"{APP_NAME} {APP_VERSION}")
+        self.geometry("960x640")
+        self.minsize(800, 560)
+        self.resizable(True, True)
+
+        # 布局
+        self.grid_rowconfigure(0, weight=0)   # 标题
+        self.grid_rowconfigure(1, weight=1)   # 主内容
+        self.grid_rowconfigure(2, weight=0)   # 按钮
+        self.grid_rowconfigure(3, weight=0)   # 状态栏
+        self.grid_columnconfigure(0, weight=1)
+
+        self._build_header()
+        self._build_main()
+        self._build_buttons()
+        self._build_status_bar()
+
         self._refresh_wallpaper_list()
 
-    def _build_ui(self):
-        # 标题
-        title_frame = Frame(self.root, pady=10)
-        title_frame.pack(fill=X)
-        Label(title_frame, text=APP_NAME, font=("Microsoft YaHei", 16, "bold")).pack()
-        Label(title_frame, text="每日 4K Bing 壁纸自动抓取 & 桌面设置", font=("Microsoft YaHei", 9), fg="gray").pack()
+        # 绑定 resize 事件，窗口大小变化时重新缩放预览图
+        self.bind("<Configure>", self._on_configure)
 
-        # 主内容区
-        main_frame = Frame(self.root, padx=20, pady=5)
-        main_frame.pack(fill=BOTH, expand=True)
+    # ── 标题区 ──────────────────────────────────────────────────────────────
 
-        # 壁纸目录
-        dir_frame = LabelFrame(main_frame, text="壁纸保存目录", pady=5, padx=10)
-        dir_frame.pack(fill=X, pady=(0, 10))
+    def _build_header(self):
+        header = ctk.CTkFrame(self, fg_color="transparent", height=72)
+        header.grid(row=0, column=0, sticky="ew", padx=24, pady=(16, 0))
+        header.grid_propagate(False)
+        header.grid_columnconfigure(0, weight=1)
 
-        self.dir_var = StringVar(value=self.cfg["save_dir"])
-        dir_entry = Entry(dir_frame, textvariable=self.dir_var, state="readonly", width=50)
-        dir_entry.pack(side=LEFT, fill=X, expand=True)
+        ctk.CTkLabel(
+            header, text="🖼️  4K Bing 壁纸工具",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=22, weight="bold"),
+        ).grid(row=0, column=0, sticky="w")
 
-        Button(dir_frame, text="打开", command=self._open_dir, width=6).pack(side=RIGHT, padx=(5, 0))
+        ctk.CTkLabel(
+            header, text="每日 4K Bing 壁纸自动抓取 & 桌面设置",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=13),
+            text_color="gray",
+        ).grid(row=1, column=0, sticky="w", pady=(2, 0))
 
-        # 壁纸列表
-        list_frame = LabelFrame(main_frame, text="已下载壁纸", pady=5, padx=10)
-        list_frame.pack(fill=BOTH, expand=True, pady=(0, 10))
+    # ── 主内容区（左：列表 + 右：预览） ──────────────────────────────────────
 
-        self.listbox = Listbox(list_frame, height=8, font=("Consolas", 10))
-        scrollbar = Scrollbar(list_frame, orient=VERTICAL, command=self.listbox.yview)
-        self.listbox.configure(yscrollcommand=scrollbar.set)
-        self.listbox.pack(side=LEFT, fill=BOTH, expand=True)
-        scrollbar.pack(side=RIGHT, fill=Y)
+    def _build_main(self):
+        main = ctk.CTkFrame(self, fg_color="transparent")
+        main.grid(row=1, column=0, sticky="nsew", padx=24, pady=8)
+        main.grid_rowconfigure(1, weight=1)
+        main.grid_columnconfigure(0, weight=3)   # 列表占 3/5
+        main.grid_columnconfigure(1, weight=2)   # 预览占 2/5
 
-        # 模式选择
-        mode_frame = LabelFrame(main_frame, text="设置模式", pady=5, padx=10)
-        mode_frame.pack(fill=X, pady=(0, 10))
+        # ── 目录选择行 ──
+        dir_row = ctk.CTkFrame(main, fg_color="transparent")
+        dir_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+        dir_row.grid_columnconfigure(0, weight=1)
 
-        self.mode_var = StringVar(value="single")
-        Radiobutton(mode_frame, text="单张壁纸", variable=self.mode_var, value="single").pack(side=LEFT, padx=(0, 20))
-        Radiobutton(mode_frame, text="幻灯片轮换", variable=self.mode_var, value="slideshow").pack(side=LEFT)
+        self.dir_var = ctk.StringVar(value=self.cfg["save_dir"])
 
-        # 状态栏
-        self.status_var = StringVar(value="就绪")
-        status_bar = Label(self.root, textvariable=self.status_var, bd=1, relief=SUNKEN, anchor=W, padx=10)
-        status_bar.pack(side=BOTTOM, fill=X)
+        self.dir_entry = ctk.CTkEntry(
+            dir_row, textvariable=self.dir_var,
+            state="readonly", height=36,
+            font=ctk.CTkFont(family="Microsoft YaHei", size=12),
+        )
+        self.dir_entry.grid(row=0, column=0, sticky="ew", padx=(0, 8))
 
-        # 按钮区
-        btn_frame = Frame(self.root, padx=20, pady=10)
-        btn_frame.pack(fill=X, side=BOTTOM)
+        ctk.CTkButton(
+            dir_row, text="📂 选择目录", command=self._choose_dir,
+            width=110, height=36, corner_radius=8,
+            font=ctk.CTkFont(family="Microsoft YaHei", size=12),
+        ).grid(row=0, column=1)
 
-        Button(btn_frame, text="📥 下载今日壁纸", command=self._fetch_today, width=16, bg="#4CAF50", fg="white").pack(side=LEFT, padx=(0, 8))
-        Button(btn_frame, text="📦 批量下载", command=self._fetch_batch, width=12).pack(side=LEFT, padx=(0, 8))
-        Button(btn_frame, text="🖼️ 设为壁纸", command=self._set_wallpaper, width=12, bg="#2196F3", fg="white").pack(side=LEFT, padx=(0, 8))
-        Button(btn_frame, text="🔄 启用幻灯片", command=self._enable_slideshow, width=12).pack(side=LEFT)
+        # ── 左侧：壁纸列表卡片 ──
+        list_card = ctk.CTkFrame(main, corner_radius=12)
+        list_card.grid(row=1, column=0, sticky="nsew", padx=(0, 8))
+        list_card.grid_rowconfigure(1, weight=1)
+        list_card.grid_columnconfigure(0, weight=1)
 
-    def _open_dir(self):
-        os.startfile(self.dir_var.get())
+        list_header = ctk.CTkFrame(list_card, fg_color="transparent", height=36)
+        list_header.grid(row=0, column=0, sticky="ew", padx=12, pady=(8, 2))
+        list_header.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            list_header, text="📋 已下载壁纸",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=13, weight="bold"),
+        ).grid(row=0, column=0, sticky="w")
+
+        self.count_label = ctk.CTkLabel(
+            list_header, text="共 0 张",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+            text_color="gray",
+        )
+        self.count_label.grid(row=0, column=1, sticky="e")
+
+        ctk.CTkFrame(list_card, height=1, fg_color=("gray80", "gray30")).grid(
+            row=0, column=0, sticky="new", padx=12, pady=(32, 0))
+
+        self.list_scroll = ctk.CTkScrollableFrame(list_card, corner_radius=8)
+        self.list_scroll.grid(row=1, column=0, sticky="nsew", padx=4, pady=4)
+        self._list_items = []
+
+        # ── 右侧：预览卡片 ──
+        preview_card = ctk.CTkFrame(main, corner_radius=12)
+        preview_card.grid(row=1, column=1, sticky="nsew", padx=(8, 0))
+        preview_card.grid_rowconfigure(1, weight=1)
+        preview_card.grid_columnconfigure(0, weight=1)
+
+        preview_header = ctk.CTkFrame(preview_card, fg_color="transparent", height=36)
+        preview_header.grid(row=0, column=0, sticky="ew", padx=12, pady=(8, 2))
+
+        ctk.CTkLabel(
+            preview_header, text="👁️ 预览",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=13, weight="bold"),
+        ).pack(side="left")
+
+        ctk.CTkFrame(preview_card, height=1, fg_color=("gray80", "gray30")).grid(
+            row=0, column=0, sticky="new", padx=12, pady=(32, 0))
+
+        # 预览图区域 —— 不设置任何固定尺寸，完全自适应
+        self.preview_body = ctk.CTkFrame(preview_card, fg_color="transparent")
+        self.preview_body.grid(row=1, column=0, sticky="nsew", padx=12, pady=8)
+        self.preview_body.grid_rowconfigure(0, weight=1)
+        self.preview_body.grid_columnconfigure(0, weight=1)
+
+        self.preview_label = ctk.CTkLabel(
+            self.preview_body,
+            text="点击壁纸\n查看预览",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=13),
+            text_color="gray",
+            corner_radius=8,
+            fg_color=("gray90", "gray20"),
+        )
+        self.preview_label.grid(row=0, column=0, sticky="nsew")
+
+        self.preview_info = ctk.CTkLabel(
+            self.preview_body, text="",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+            text_color="gray", anchor="center",
+        )
+        self.preview_info.grid(row=1, column=0, pady=(8, 0))
+
+        # ── 模式选择行 ──
+        mode_row = ctk.CTkFrame(main, fg_color="transparent")
+        mode_row.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+
+        ctk.CTkLabel(
+            mode_row, text="⚙️ 设置模式",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=13, weight="bold"),
+        ).pack(side="left", padx=(4, 16))
+
+        self.mode_var = ctk.StringVar(value="single")
+
+        ctk.CTkRadioButton(
+            mode_row, text="单张壁纸", variable=self.mode_var, value="single",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=12),
+        ).pack(side="left", padx=(0, 20))
+
+        ctk.CTkRadioButton(
+            mode_row, text="幻灯片轮换", variable=self.mode_var, value="slideshow",
+            font=ctk.CTkFont(family="Microsoft YaHei", size=12),
+        ).pack(side="left")
+
+    # ── 按钮区 ───────────────────────────────────────────────────────────────
+
+    def _build_buttons(self):
+        btn_frame = ctk.CTkFrame(self, fg_color="transparent", height=52)
+        btn_frame.grid(row=2, column=0, sticky="ew", padx=24, pady=(4, 8))
+        btn_frame.grid_propagate(False)
+
+        for i in range(4):
+            btn_frame.grid_columnconfigure(i, weight=1)
+
+        buttons = [
+            ("📥  下载今日", "#2E7D32", "#4CAF50", self._fetch_today),
+            ("📦  批量下载", "#1565C0", "#1E88E5", self._fetch_batch),
+            ("🖼️  设为壁纸", "#6A1B9A", "#8E24AA", self._set_wallpaper),
+            ("🔄  幻灯片", "#E65100", "#F57C00", self._enable_slideshow),
+        ]
+
+        for i, (text, hover, fg, cmd) in enumerate(buttons):
+            ctk.CTkButton(
+                btn_frame, text=text, command=cmd,
+                font=ctk.CTkFont(family="Microsoft YaHei", size=13, weight="bold"),
+                height=42, corner_radius=10,
+                fg_color=fg, hover_color=hover,
+            ).grid(row=0, column=i, sticky="ew", padx=(0 if i == 0 else 6, 0))
+
+    # ── 状态栏 ───────────────────────────────────────────────────────────────
+
+    def _build_status_bar(self):
+        self.status_var = ctk.StringVar(value="就绪")
+        ctk.CTkLabel(
+            self, textvariable=self.status_var,
+            font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+            text_color="gray", anchor="w", height=28,
+        ).grid(row=3, column=0, sticky="ew", padx=24, pady=(0, 8))
+
+    # ── 目录选择 ─────────────────────────────────────────────────────────────
+
+    def _choose_dir(self):
+        d = filedialog.askdirectory(title="选择壁纸保存目录")
+        if d:
+            self.dir_var.set(d)
+            self.cfg["save_dir"] = d
+            save_config(self.cfg)
+            self._refresh_wallpaper_list()
+
+    # ── 壁纸列表 & 预览 ──────────────────────────────────────────────────────
 
     def _refresh_wallpaper_list(self):
-        self.listbox.delete(0, END)
+        for item in self._list_items:
+            item[0].destroy()
+        self._list_items.clear()
+
         save_dir = Path(self.dir_var.get())
         if save_dir.is_dir():
             valid_ext = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
             images = sorted([f for f in save_dir.iterdir() if f.suffix.lower() in valid_ext])
             for img in images:
                 size_mb = img.stat().st_size / (1024 * 1024)
-                self.listbox.insert(END, f"{img.name}  ({size_mb:.1f} MB)")
-            self._set_status(f"共 {len(images)} 张壁纸")
+                row = ctk.CTkFrame(self.list_scroll, fg_color="transparent", height=32)
+                row.pack(fill="x", padx=8, pady=1)
+                row.pack_propagate(False)
+
+                lbl = ctk.CTkLabel(
+                    row,
+                    text=f"  {img.name}    ({size_mb:.1f} MB)",
+                    font=ctk.CTkFont(family="Microsoft YaHei", size=11),
+                    anchor="w", text_color=("gray20", "gray80"),
+                )
+                lbl.pack(fill="x", side="left", expand=True)
+
+                for widget in (row, lbl):
+                    widget.bind("<Button-1>", lambda e, p=img: self._on_select(p))
+
+                self._list_items.append((row, lbl, img))
+
+            count = len(images)
+        else:
+            count = 0
+
+        self.count_label.configure(text=f"共 {count} 张")
+
+    def _on_select(self, path: Path):
+        """选中壁纸时更新预览"""
+        self._selected_path = path
+
+        # 高亮选中项
+        for row, lbl, fp in self._list_items:
+            if fp == path:
+                row.configure(fg_color=("gray85", "gray25"))
+                lbl.configure(text_color=("gray10", "white"))
+            else:
+                row.configure(fg_color="transparent")
+                lbl.configure(text_color=("gray20", "gray80"))
+
+        # 加载原始图片，保存引用以便 resize 时重新缩放
+        try:
+            self._preview_original = PIL.Image.open(path)
+            self._render_preview()
+            size_mb = path.stat().st_size / (1024 * 1024)
+            w, h = self._preview_original.size
+            self.preview_info.configure(
+                text=f"{path.name}\n{w}×{h}  |  {size_mb:.1f} MB"
+            )
+        except Exception:
+            self._preview_original = None
+            self.preview_label.configure(text="无法预览", image="")
+            self.preview_info.configure(text="")
+
+    def _render_preview(self):
+        """根据预览区实际大小缩放并显示图片"""
+        if self._preview_original is None:
+            return
+
+        # 获取预览区实际可用尺寸（减去 padding）
+        self.preview_body.update_idletasks()
+        avail_w = self.preview_body.winfo_width() - 16
+        avail_h = self.preview_body.winfo_height() - 16
+
+        if avail_w <= 1 or avail_h <= 1:
+            return  # 还没布局好，跳过
+
+        img = self._preview_original.copy()
+        img.thumbnail((avail_w, avail_h), PIL.Image.LANCZOS)
+        self._preview_photo = PIL.ImageTk.PhotoImage(img)
+        self.preview_label.configure(
+            image=self._preview_photo, text="",
+            fg_color="transparent",
+        )
+
+    def _on_configure(self, event):
+        """窗口大小变化时重绘预览图"""
+        # 过滤掉非窗口事件和过小的变化，避免频繁重绘
+        if event.widget is self and self._preview_original is not None:
+            # 用 after 做防抖，避免连续触发
+            if hasattr(self, "_resize_after_id"):
+                self.after_cancel(self._resize_after_id)
+            self._resize_after_id = self.after(150, self._render_preview)
+
+    # ── 状态更新 ─────────────────────────────────────────────────────────────
 
     def _set_status(self, text: str):
         self.status_var.set(text)
-        self.root.update_idletasks()
+        self.update_idletasks()
+
+    # ── 业务逻辑 ─────────────────────────────────────────────────────────────
 
     def _fetch_today(self):
         def task():
-            self._set_status("正在获取今日壁纸...")
+            self._set_status("⏳ 正在获取今日壁纸...")
             images = fetch_bing_images(count=1)
             if not images:
                 self._set_status("❌ 获取失败")
                 return
             img = images[0]
-            self._set_status(f"正在下载: {img['title']}")
+            self._set_status(f"⏳ 正在下载: {img['title']}")
             save_dir = ensure_dir(self.dir_var.get())
             path = download_image(img["url"], save_dir, img.get("title", ""))
             if path:
                 self.cfg["save_dir"] = str(save_dir)
                 save_config(self.cfg)
-                self.root.after(0, self._refresh_wallpaper_list)
-                self.root.after(0, self._set_status, f"✅ 已下载: {img['title']}")
+                self.after(0, self._refresh_wallpaper_list)
+                self._set_status(f"✅ 已下载: {img['title']}")
                 if self.mode_var.get() == "single":
                     set_windows_wallpaper(str(path))
-                    self.root.after(0, self._set_status, f"✅ 壁纸已设置: {img['title']}")
+                    self._set_status(f"✅ 壁纸已设置: {img['title']}")
             else:
                 self._set_status("❌ 下载失败")
         threading.Thread(target=task, daemon=True).start()
@@ -288,7 +526,7 @@ class WallpaperApp:
     def _fetch_batch(self):
         count = 10
         def task():
-            self._set_status(f"正在获取 {count} 张壁纸...")
+            self._set_status(f"⏳ 正在获取 {count} 张壁纸...")
             images = fetch_bing_images(count=count)
             if not images:
                 self._set_status("❌ 获取失败")
@@ -296,31 +534,24 @@ class WallpaperApp:
             save_dir = ensure_dir(self.dir_var.get())
             success = 0
             for i, img in enumerate(images):
-                self._set_status(f"下载中 ({i+1}/{len(images)}): {img['title']}")
+                self._set_status(f"⏳ 下载中 ({i+1}/{len(images)}): {img['title']}")
                 path = download_image(img["url"], save_dir, img.get("title", ""))
                 if path:
                     success += 1
             self.cfg["save_dir"] = str(save_dir)
             save_config(self.cfg)
-            self.root.after(0, self._refresh_wallpaper_list)
-            self.root.after(0, self._set_status, f"✅ 批量下载完成: {success}/{len(images)} 张成功")
+            self.after(0, self._refresh_wallpaper_list)
+            self._set_status(f"✅ 批量下载完成: {success}/{len(images)} 张成功")
         threading.Thread(target=task, daemon=True).start()
 
     def _set_wallpaper(self):
-        selection = self.listbox.curselection()
-        if not selection:
+        if self._selected_path is None:
             messagebox.showwarning("提示", "请先从列表中选择一张壁纸")
             return
-        save_dir = Path(self.dir_var.get())
-        valid_ext = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
-        images = sorted([f for f in save_dir.iterdir() if f.suffix.lower() in valid_ext])
-        idx = selection[0]
-        if idx < len(images):
-            path = images[idx]
-            if set_windows_wallpaper(str(path)):
-                self._set_status(f"✅ 壁纸已设置: {path.name}")
-            else:
-                self._set_status("❌ 设置失败")
+        if set_windows_wallpaper(str(self._selected_path)):
+            self._set_status(f"✅ 壁纸已设置: {self._selected_path.name}")
+        else:
+            self._set_status("❌ 设置失败")
 
     def _enable_slideshow(self):
         interval = self.cfg.get("slideshow_interval", 1)
@@ -330,12 +561,9 @@ class WallpaperApp:
             self._set_status("❌ 启用失败，请确保目录中有壁纸")
 
 
-# ── 入口 ──────────────────────────────────────────────────────────────────────
-
 def main():
-    root = Tk()
-    app = WallpaperApp(root)
-    root.mainloop()
+    app = WallpaperApp()
+    app.mainloop()
 
 
 if __name__ == "__main__":

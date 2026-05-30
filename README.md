@@ -13,7 +13,7 @@ Automatically fetch daily Bing 4K wallpapers and set them as your desktop backgr
 - 🌐 **Dual-source fetching** — peapix.com as primary, Bing official API as fallback
 - 🖼️ **True 4K UHD** — uses Bing `_UHD.jpg` original image (3-5MB+)
 - 🔄 **Slideshow** — auto-rotate all wallpapers in your local directory
-- 💻 **GUI interface** — built with tkinter, no command line needed
+- 💻 **Modern GUI** — built with customtkinter, dark theme, responsive layout
 - 📦 **Standalone exe** — can be packaged into a single file, no Python required
 
 ## Quick Start
@@ -47,7 +47,7 @@ python src/wallpaper_core.py --schedule
 ## Screenshot
 
 <div align="center">
-  <img src="screenshots/BingWallpaper_run.png" alt="Screenshot" width="640">
+  <img src="screenshots/BingWallpaper_run.png" alt="Screenshot" width="960">
 </div>
 
 ## Install
@@ -116,6 +116,8 @@ BingWallpaper/
 │   └── BingWallpaper.exe     # Packaged standalone program
 ├── config.json               # Configuration file
 ├── requirements.txt          # Python dependencies
+├── screenshots/              # Screenshots for README
+└── scripts/                  # Utility scripts
 ├── LICENSE                   # MIT License
 ├── README.md                 # This file
 └── .github/

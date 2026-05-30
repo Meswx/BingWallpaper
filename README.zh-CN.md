@@ -13,7 +13,7 @@
 - 🌐 **双源抓取** — peapix.com 优先，Bing 官方 API 自动备用
 - 🖼️ **真 4K UHD** — 使用 Bing `_UHD.jpg` 原图（3-5MB+）
 - 🔄 **幻灯片放映** — 自动轮换壁纸目录中的所有图片
-- 💻 **GUI 界面** — 基于 tkinter，无需命令行
+- 💻 **现代 GUI** — 基于 customtkinter，深色主题，自适应布局
 - 📦 **独立 exe** — 可打包为单文件，无需 Python 环境
 
 ## 快速开始
@@ -47,7 +47,7 @@ python src/wallpaper_core.py --schedule
 ## 界面预览
 
 <div align="center">
-  <img src="screenshots/BingWallpaper_run.png" alt="界面预览" width="640">
+  <img src="screenshots/BingWallpaper_run.png" alt="界面预览" width="960">
 </div>
 
 ## 安装

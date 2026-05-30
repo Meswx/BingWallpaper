@@ -28,11 +28,17 @@ ctk.set_default_color_theme("blue")
 # ── 应用配置 ──────────────────────────────────────────────────────────────────
 
 APP_NAME = "4K Bing 壁纸工具"
-APP_VERSION = "v0.1.0"
+APP_VERSION = "v0.2.0"
+# 程序运行目录：源码运行时是项目目录，打包后是 exe 所在目录
+if getattr(sys, 'frozen', False):
+    APP_DIR = Path(sys.executable).parent
+else:
+    APP_DIR = Path(__file__).parent.parent
+
 CONFIG_PATH = Path(__file__).parent / "config.json"
 DEFAULT_CONFIG = {
     "source_url": "https://peapix.com/bing",
-    "save_dir": str(Path(__file__).parent.parent / "wallpapers"),
+    "save_dir": str(APP_DIR / "wallpapers"),
     "resolution": "3840x2160",
     "set_wallpaper": True,
     "save_wallpaper": True,
